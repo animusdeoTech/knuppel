@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<!--
+  KNUPPEL TRAINER — daily film + log tool (NOT the progression engine).
+  RUN NOTE — the in-app camera needs a SECURE CONTEXT (https or localhost).
+  * Opening this file as a download (file://) => camera is blocked by the browser;
+    logging still works fully. To get the camera outdoors, host over https:
+      - GitHub Pages (push trainer.html, open the https URL), or
+      - npx http-server -S -C cert.pem -K key.pem   (the -S = https)
+    `python3 -m http.server` is plain http => NOT https => camera will NOT work.
+-->
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0d0d0f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Knuppel · Trainer</title>
+<style>
+  :root{
+    --bg:#0d0d0f; --panel:#16161a; --panel-2:#1d1d22; --line:#2a2a31;
+    --txt:#f4f1ea; --muted:#8c8a93; --ember:#d6602a; --ember-2:#f0833f;
+    --ok:#3fae6a; --iron:#3a3a42; --bad:#ff8a7a; --r:14px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;min-height:100%}
+  body{background:var(--bg);color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    padding:0 0 40px;overscroll-behavior:none}
+  h1,h2,h3{margin:0;font-weight:700;letter-spacing:.2px}
+  .wrap{max-width:560px;margin:0 auto;padding:14px 16px}
+  header{display:flex;align-items:baseline;justify-content:space-between;max-width:560px;margin:0 auto;padding:16px 16px 4px}
+  header .brand{font-size:22px;letter-spacing:3px;text-transform:uppercase}
+  header .brand b{color:var(--ember)}
+  header .sub{color:var(--muted);font-size:12px;letter-spacing:1px}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:12px}
+  .muted{color:var(--muted)}
+  .row{display:flex;align-items:center;gap:10px}
+  .between{justify-content:space-between}
+  .pill{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:3px 9px}
+
+  .banner{background:#2a1810;border:1px solid #5a2e18;color:#f0b89a;border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:13px;line-height:1.55}
+  .banner b{color:#ffd9c2}
+  .banner code{background:#1a0f0a;padding:1px 5px;border-radius:5px;font-size:12px}
+
+  .cues{font-size:13.5px;line-height:1.7;color:var(--ember-2)}
+  .cues b{color:var(--txt)}
+
+  button{font-family:inherit;cursor:pointer;border:none;color:var(--txt);background:none}
+  .btn{background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:13px 16px;font-size:15px;font-weight:600;width:100%;transition:.12s}
+  .btn:active{transform:scale(.985)}
+  .btn.primary{background:linear-gradient(180deg,var(--ember-2),var(--ember));border-color:transparent;color:#1a0d06}
+  .btn.go{background:linear-gradient(180deg,#46c178,var(--ok));color:#06160c;border-color:transparent}
+  .btn.ghost{background:transparent}
+  .btn.sm{width:auto;padding:9px 13px;font-size:13px;flex:1}
+  .btn.big{padding:20px 16px;font-size:18px;font-weight:800}
+  .btn.klaar{padding:30px 16px;font-size:24px;font-weight:800}
+
+  .opts{display:flex;gap:8px;margin-bottom:12px}
+  .opt{flex:1;border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:11px 12px;font-size:13.5px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:600}
+  .opt.on{border-color:var(--ember)}
+  .opt .sw{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+  .opt.on .sw{color:var(--ember-2)}
+
+  .blockhead{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px}
+  .blockhead h2{font-size:18px}
+  .blockhead .gear{font-size:12.5px;color:var(--muted);padding:4px}
+
+  .settings{border:1px dashed var(--line);border-radius:12px;padding:10px;margin-bottom:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .setting{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:12.5px;color:var(--muted)}
+  .mini{display:flex;align-items:center;gap:6px}
+  .mini button{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:17px;font-weight:700;color:var(--txt)}
+  .mini .v{min-width:46px;text-align:center;font-size:14px;font-weight:800;color:var(--txt);font-variant-numeric:tabular-nums}
+
+  .live{text-align:center;padding:18px 14px;border-radius:14px;margin:6px 0 12px}
+  .live.run{background:#1a1410;border:1px solid #3a2a18}
+  .live.rest{background:#0f1612;border:1px solid #234031}
+  .live.lead{background:#161018;border:1px solid #3a2a44}
+  .live .lbl{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+  .live .t{font-size:64px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.05;margin:4px 0 2px}
+  .live.run .t{color:var(--ember-2)}
+  .live.rest .t{color:var(--ok)}
+  .live.rest.go .t{color:var(--ember-2)}
+  .live.lead .t{color:#c79be0;font-size:84px}
+  .live .sub2{font-size:12.5px;color:var(--muted)}
+
+  .repset{display:flex;align-items:center;justify-content:center;gap:14px;margin:10px 0 12px}
+  .repset button{width:64px;height:64px;border-radius:16px;border:1px solid var(--line);background:var(--panel-2);font-size:32px;font-weight:700}
+  .repset button:active{background:var(--iron)}
+  .repset .rv{min-width:96px;text-align:center}
+  .repset .rv .n{font-size:46px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
+  .repset .rv .u{font-size:11px;color:var(--muted);letter-spacing:1px}
+
+  .sets{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+  .setrow{display:grid;grid-template-columns:30px 1fr auto;gap:10px;align-items:center;background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:10px}
+  .setrow.done{border-color:#23331f;background:#13180f}
+  .setrow .idx{text-align:center;color:var(--muted);font-weight:700}
+  .setrow .mid{display:flex;flex-direction:column;gap:2px}
+  .setrow .reps{font-size:16px;font-weight:700}
+  .setrow .meta{font-size:11.5px;color:var(--muted)}
+  .setrow .check{width:30px;height:30px;border-radius:8px;background:var(--ok);color:#06160c;display:flex;align-items:center;justify-content:center;font-weight:800}
+  .setrow .noclip{font-size:16px;color:var(--muted)}
+  .clipbtn{font-size:12px;color:var(--ember-2);padding:6px 8px;border:1px solid var(--line);border-radius:9px}
+
+  .wc{display:flex;justify-content:space-between;margin-top:12px;font-size:13px;align-items:baseline}
+  .wc b{font-size:18px;font-variant-numeric:tabular-nums}
+  .toggle{font-size:13px;color:var(--ember-2);padding:6px 2px}
+
+  #cam{max-width:560px;margin:0 auto;padding:0 16px}
+  #cam video{width:100%;border-radius:12px;border:1px solid var(--line);background:#000;display:block}
+  .rec{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--bad);margin-top:6px}
+  .rec .dot{width:9px;height:9px;border-radius:50%;background:var(--bad);animation:pulse 1s infinite}
+  @keyframes pulse{50%{opacity:.3}}
+
+  #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:#23232a;border:1px solid var(--line);color:var(--txt);padding:12px 18px;border-radius:12px;font-size:14px;opacity:0;pointer-events:none;transition:.25s;z-index:60;max-width:90%;text-align:center}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">KNU<b>PP</b>EL</div>
+  <div class="sub" id="dateLbl"></div>
+</header>
+
+<div id="cam"></div>
+<main class="wrap" id="view"></main>
+
+<script>
+"use strict";
+/* ============================================================================
+   KNUPPEL TRAINER — Pieter's own session logger + per-set camera clips.
+   Daily film+log tool, NOT the progression engine. Single file, vanilla JS,
+   offline-first. Clips persist in IndexedDB; only metadata in localStorage.
+   ============================================================================ */
+
+const now=()=>Date.now();
+const $=s=>document.querySelector(s);
+const clamp=(v,lo)=>Math.max(lo,v);
+function fmt(ms){ const t=Math.max(0,Math.round(ms/1000)); const m=Math.floor(t/60),s=t%60; return m+':'+String(s).padStart(2,'0'); }
+function fmtSigned(ms){ return (ms<0?'+':'')+fmt(Math.abs(ms)); }   // rest overtime as +m:ss
+
+/* ---------- SECURE CONTEXT REQUIRED (camera) ---------- */
+// getUserMedia/MediaRecorder only run in a secure context (https or localhost).
+const SECURE = !!(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+const REC_OK = SECURE && typeof MediaRecorder!=='undefined';
+const VIDEO_CONSTRAINTS = { video:{ facingMode:'environment', width:{ideal:1280}, height:{ideal:720} }, audio:true };
+let VIDEO_MIME='';
+if(typeof MediaRecorder!=='undefined' && MediaRecorder.isTypeSupported){
+  ['video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'].forEach(m=>{ if(!VIDEO_MIME && MediaRecorder.isTypeSupported(m)) VIDEO_MIME=m; });
+}
+
+/* ============================================================================
+   IndexedDB — clip blob persistence (metadata stays in localStorage)
+   ============================================================================ */
+const IDB_NAME='knuppelTrainer', IDB_STORE='clips';
+let _db=null, _dbTried=false;
+function getIDB(){
+  if(_db) return Promise.resolve(_db);
+  return new Promise(res=>{
+    try{
+      const r=indexedDB.open(IDB_NAME,1);
+      r.onupgradeneeded=()=>{ const db=r.result; if(!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE); };
+      r.onsuccess=()=>{ _db=r.result; res(_db); };
+      r.onerror=()=>res(null);
+    }catch(e){ res(null); }
+  });
+}
+async function idbPut(key,blob){ const db=await getIDB(); if(!db) throw new Error('geen opslag'); return new Promise((res,rej)=>{ try{ const tx=db.transaction(IDB_STORE,'readwrite'); tx.objectStore(IDB_STORE).put(blob,key); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); }catch(e){ rej(e); } }); }
+async function idbGet(key){ const db=await getIDB(); if(!db) return null; return new Promise(res=>{ try{ const tx=db.transaction(IDB_STORE,'readonly'); const rq=tx.objectStore(IDB_STORE).get(key); rq.onsuccess=()=>res(rq.result||null); rq.onerror=()=>res(null);}catch(e){ res(null);} }); }
+async function idbDel(key){ const db=await getIDB(); if(!db) return; return new Promise(res=>{ try{ const tx=db.transaction(IDB_STORE,'readwrite'); tx.objectStore(IDB_STORE).delete(key); tx.oncomplete=()=>res(); tx.onerror=()=>res();}catch(e){ res(); } }); }
+async function idbClear(){ const db=await getIDB(); if(!db) return; return new Promise(res=>{ try{ const tx=db.transaction(IDB_STORE,'readwrite'); tx.objectStore(IDB_STORE).clear(); tx.oncomplete=()=>res(); tx.onerror=()=>res();}catch(e){ res(); } }); }
+
+/* ============================================================================
+   STATE
+   ============================================================================ */
+const KEY='knuppel.trainer.v1';
+function freshBlock(id,name,reps,enabled){ return { id,name,weight:20,targetReps:reps,targetSets:6,restSec:180,leadInSec:8,enabled:enabled!==false,sets:[] }; }
+function fresh(prevWC){
+  return { date:now(), autoChain:true, autoStop:false, autoStopSec:40, camOn:false, prevWC:prevWC||{},
+    cues:['pack lats & pull ribcage','pull with your core','generate power from the feet'],
+    blocks:[ freshBlock('frustum','Frustum',32,true), freshBlock('squat','Squats',16,false) ] };
+}
+function lget(){ try{ const v=JSON.parse(localStorage.getItem(KEY)); return v&&v.blocks? v : fresh(); }catch(e){ return fresh(); } }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+let S = lget();
+
+// live set/rest state (NOT persisted). phases: 'leadin' | 'running' | 'resting'
+let live = null;
+let settingsOpen = {};
+const clips = {};                 // transient object-URL cache (blobs live in IndexedDB)
+let recOkThisSet = false;
+let _finishing = false;
+
+const blockById = id => S.blocks.find(b=>b.id===id);
+function setRestBefore(b,i){ if(i<=0) return null; return b.sets[i].start - b.sets[i-1].end; }
+function wc(b){ return b.weight * b.sets.reduce((a,s)=>a+(+s.reps||0),0); }
+function totalWc(){ return S.blocks.filter(b=>b.enabled).reduce((a,b)=>a+wc(b),0); }
+function clipCount(){ return S.blocks.reduce((a,b)=>a+b.sets.filter(s=>s.hasClip).length,0); }
+
+/* ============================================================================
+   AUDIO (loud, distinct cues) + WAKELOCK
+   ============================================================================ */
+let actx=null, muted=false;
+function initAudio(){ try{ actx=actx||new (window.AudioContext||window.webkitAudioContext)(); if(actx.state==='suspended') actx.resume(); }catch(e){} }
+function beep(freq,dur,vol){ if(muted) return; try{ initAudio(); if(!actx)return; const o=actx.createOscillator(),g=actx.createGain(); o.frequency.value=freq||660; o.connect(g); g.connect(actx.destination); const t=actx.currentTime; g.gain.setValueAtTime(vol||0.25,t); g.gain.exponentialRampToValueAtTime(0.0001,t+(dur||0.12)); o.start(t); o.stop(t+(dur||0.12)+0.02);}catch(e){} }
+const beepTick =()=>beep(560,0.08,0.24);                                   // lead-in / last-3s rest
+function beepGo(){ beep(900,0.18,0.4); setTimeout(()=>beep(1180,0.24,0.4),170); }  // loud GO
+function beepRestOver(){ beep(700,0.22,0.34); setTimeout(()=>beep(700,0.22,0.34),260); }  // rust voorbij
+
+let wakeLock=null;
+async function reqWake(){ try{ if('wakeLock' in navigator) wakeLock=await navigator.wakeLock.request('screen'); }catch(e){} }
+function relWake(){ try{ wakeLock&&wakeLock.release(); wakeLock=null; }catch(e){} }
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && live) reqWake(); });
+
+/* ============================================================================
+   CAMERA (optional, secure-context only)
+   ============================================================================ */
+let stream=null, rec=null, chunks=[];
+async function enableCam(){
+  if(!REC_OK){ flash('Camera vereist https'); return; }
+  initAudio();
+  try{ stream=await navigator.mediaDevices.getUserMedia(VIDEO_CONSTRAINTS); S.camOn=true; renderCam(); save(); render(); }
+  catch(e){ alert('Camera niet beschikbaar of geweigerd:\n'+e.message); }
+}
+function disableCam(){ try{ stream&&stream.getTracks().forEach(t=>t.stop()); }catch(e){} stream=null; S.camOn=false; renderCam(); save(); render(); }
+function renderCam(){
+  const c=$('#cam'); if(!c) return;
+  if(stream){ c.innerHTML='<video id="preview" autoplay muted playsinline></video><div class="rec" id="recdot" style="display:none"><span class="dot"></span>OPNAME</div>'; const v=$('#preview'); if(v) v.srcObject=stream; }
+  else c.innerHTML='';
+}
+function startRec(){
+  recOkThisSet=false;
+  if(!stream || typeof MediaRecorder==='undefined') return false;
+  try{
+    chunks=[]; rec=new MediaRecorder(stream, VIDEO_MIME?{mimeType:VIDEO_MIME}:undefined);
+    rec.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
+    rec.onerror=()=>{};
+    rec.start(); recOkThisSet=true;
+    const d=$('#recdot'); if(d) d.style.display='inline-flex';
+    return true;
+  }catch(e){ rec=null; return false; }
+}
+function stopRec(){ return new Promise(res=>{ const d=$('#recdot'); if(d) d.style.display='none'; if(!rec||rec.state==='inactive'){ res(null); return; }
+  rec.onstop=()=>{ try{ const blob=new Blob(chunks,{type:(chunks[0]&&chunks[0].type)||VIDEO_MIME||'video/mp4'}); res(blob&&blob.size?blob:null);}catch(e){ res(null);} };
+  try{ rec.stop(); }catch(e){ res(null);} }); }
+
+async function saveClip(setId){
+  let blob=null; try{ blob=await idbGet(setId); }catch(e){}
+  if(!blob){ flash('clip niet gevonden'); return; }
+  const ext=(blob.type||'').includes('webm')?'webm':'mp4';
+  const file=new File([blob],'knuppel-set-'+setId+'.'+ext,{type:blob.type||'video/mp4'});
+  try{ if(navigator.canShare && navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:'Knuppel set'}); return; } }catch(e){}
+  const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=file.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),15000);
+}
+async function saveAllClips(){
+  const files=[];
+  for(const b of S.blocks){ for(const s of b.sets){ if(s.hasClip){ const blob=await idbGet(s.id); if(blob){ const ext=(blob.type||'').includes('webm')?'webm':'mp4'; files.push(new File([blob],'knuppel-'+b.id+'-'+s.id+'.'+ext,{type:blob.type||'video/mp4'})); } } } }
+  if(!files.length){ flash('geen clips om te bewaren'); return; }
+  try{ if(navigator.canShare && navigator.canShare({files})){ await navigator.share({files,title:'Knuppel sessie'}); return; } }catch(e){}
+  for(const f of files){ const url=URL.createObjectURL(f); const a=document.createElement('a'); a.href=url; a.download=f.name; document.body.appendChild(a); a.click(); a.remove(); await new Promise(r=>setTimeout(r,450)); URL.revokeObjectURL(url); }
+}
+function clearClips(){ if(!confirm('Alle opgeslagen clips wissen? (de gelogde sets blijven)')) return; idbClear(); S.blocks.forEach(b=>b.sets.forEach(s=>{ s.hasClip=false; })); save(); render(); flash('clips gewist'); }
+
+/* ============================================================================
+   SET / REST / LEAD-IN STATE MACHINE
+   ============================================================================ */
+function startSet(blockId){
+  const b=blockById(blockId); initAudio(); reqWake();
+  if(b.leadInSec>0){ live={ phase:'leadin', blockId, leadStart:now(), leadSec:b.leadInSec, reps:b.targetReps }; }
+  else { beginRunning(blockId, b.targetReps); }
+  render();
+}
+function beginRunning(blockId,reps){
+  beepGo();
+  live={ phase:'running', blockId, startAt:now(), reps:reps };
+  if(S.camOn) startRec();
+  render();
+}
+function adjustReps(d){ if(!live||live.phase!=='running') return; live.reps=clamp((+live.reps||0)+d,0); const el=$('#repval'); if(el) el.textContent=live.reps; }
+async function finishSet(){
+  if(!live||live.phase!=='running'||_finishing) return; _finishing=true;
+  const b=blockById(live.blockId);
+  const setId='s'+Math.random().toString(36).slice(2,9);
+  let blob=null, note='';
+  if(S.camOn){ blob=await stopRec(); if(!recOkThisSet || !blob) note='clip niet opgenomen — set wel gelogd'; }
+  const setObj={ id:setId, reps:+live.reps, start:live.startAt, end:now(), hasClip:false, mime:'' };
+  if(blob){ try{ await idbPut(setId,blob); setObj.hasClip=true; setObj.mime=blob.type||VIDEO_MIME; }catch(e){ note='clip niet bewaard ('+(e.message||'opslag')+') — set wel gelogd'; } }
+  b.sets.push(setObj);
+  if(note) flash(note);
+  live={ phase:'resting', blockId:b.id, restStart:now(), restSec:b.restSec, beeped:false };
+  _finishing=false;
+  save(); render();
+}
+function startNext(blockId){ if(live && live.phase==='resting') live=null; startSet(blockId); }
+function addExtra(blockId){ blockById(blockId).targetSets++; save(); render(); }
+function undoSet(blockId){ const b=blockById(blockId); const s=b.sets.pop(); if(s&&s.hasClip) idbDel(s.id); if(live&&live.blockId===blockId&&live.phase==='resting'&&!b.sets.length) live=null; save(); render(); }
+function stopRest(){ live=null; relWake(); render(); }     // also = cancel lead-in
+function toggleBlock(blockId){ const b=blockById(blockId); b.enabled=!b.enabled; save(); render(); }
+function toggleSettings(blockId){ settingsOpen[blockId]=!settingsOpen[blockId]; render(); }
+function tweak(blockId,field,d,lo){ const b=blockById(blockId); b[field]=clamp((+b[field]||0)+d,lo==null?1:lo); save(); render(); }
+function tweakGlobal(field,d,lo){ S[field]=clamp((+S[field]||0)+d,lo==null?1:lo); save(); render(); }
+function toggleAutoChain(){ S.autoChain=!S.autoChain; save(); render(); }
+function toggleAutoStop(){ S.autoStop=!S.autoStop; save(); render(); }
+function toggleMute(){ muted=!muted; if(!muted) initAudio(); render(); }
+function newSession(){
+  if(!confirm('Nieuwe sessie? De huidige log + clips worden gewist.')) return;
+  const prevWC={}; S.blocks.forEach(b=>{ if(b.enabled) prevWC[b.id]=wc(b); });
+  idbClear();
+  try{ stream&&stream.getTracks().forEach(t=>t.stop()); }catch(e){} stream=null;   // release camera (cool down)
+  S=fresh(prevWC); S.camOn=false; live=null; renderCam(); save(); render();
+}
+
+function flash(msg){ let t=$('#toast'); if(!t){ t=document.createElement('div'); t.id='toast'; document.body.appendChild(t);} t.textContent=msg; t.className='show'; clearTimeout(t._h); t._h=setTimeout(()=>{ t.className=''; },2800); }
+
+/* ============================================================================
+   RENDER
+   ============================================================================ */
+function liveBlockHTML(b){
+  if(live.phase==='leadin'){
+    return '<div class="live lead"><div class="lbl">Klaarmaken — ga in beeld</div>'+
+      '<div class="t" id="bigtime">'+b.leadInSec+'</div><div class="sub2">opname + klok starten zo…</div></div>'+
+      '<button class="toggle" style="display:block;text-align:center;margin:6px auto 0" onclick="stopRest()">annuleren</button>';
+  }
+  if(live.phase==='running'){
+    return ''+
+    '<div class="live run"><div class="lbl">Set '+(b.sets.length+1)+' bezig'+(S.autoStop?' · auto-stop '+S.autoStopSec+'s':'')+'</div>'+
+      '<div class="t" id="bigtime">0:00</div><div class="sub2">tel je reps — klok loopt</div></div>'+
+    '<div class="repset">'+
+      '<button onclick="adjustReps(-1)">–</button>'+
+      '<div class="rv"><div class="n" id="repval">'+live.reps+'</div><div class="u">REPS</div></div>'+
+      '<button onclick="adjustReps(1)">+</button>'+
+    '</div>'+
+    '<button class="btn primary klaar" onclick="finishSet()">Klaar ✓</button>';
+  }
+  // resting
+  const n=b.sets.length+1, more=b.sets.length<b.targetSets;
+  return ''+
+  '<div class="live rest" id="restbox"><div class="lbl">Rust</div>'+
+    '<div class="t" id="bigtime">'+fmt(b.restSec*1000)+'</div>'+
+    '<div class="sub2" id="restsub">'+(more?'tot set '+n+(S.autoChain?' · start automatisch':''):'blok klaar')+'</div></div>'+
+  (more? '<button class="btn go big" onclick="startNext(\''+b.id+'\')">▶ Start set '+n+' nu</button>'
+       : '<div class="muted" style="text-align:center;padding:6px">Doel gehaald — '+b.sets.length+' sets.</div>')+
+  '<button class="toggle" style="display:block;text-align:center;margin:8px auto 0" onclick="stopRest()">rust stoppen</button>';
+}
+
+function settingsHTML(b){
+  if(!settingsOpen[b.id]) return '';
+  const mini=(field,d,lo,fmtv)=> '<div class="mini"><button onclick="tweak(\''+b.id+'\',\''+field+'\','+(-d)+','+(lo==null?'null':lo)+')">–</button><span class="v">'+fmtv+'</span><button onclick="tweak(\''+b.id+'\',\''+field+'\','+d+','+(lo==null?'null':lo)+')">+</button></div>';
+  return '<div class="settings">'+
+    '<div class="setting"><span>doel reps</span>'+mini('targetReps',1,1,b.targetReps)+'</div>'+
+    '<div class="setting"><span>doel sets</span>'+mini('targetSets',1,1,b.targetSets)+'</div>'+
+    '<div class="setting"><span>gewicht</span>'+mini('weight',1,1,b.weight+'kg')+'</div>'+
+    '<div class="setting"><span>rust</span>'+mini('restSec',15,15,fmt(b.restSec*1000))+'</div>'+
+    '<div class="setting"><span>lead-in</span>'+mini('leadInSec',1,0,b.leadInSec+'s')+'</div>'+
+  '</div>';
+}
+
+function blockHTML(b){
+  const isLive = live && live.blockId===b.id;
+  const totReps=b.sets.reduce((a,s)=>a+s.reps,0);
+  const rows=b.sets.map((s,i)=>{
+    const rb=setRestBefore(b,i);
+    const meta='set '+fmt(s.end-s.start)+(rb!=null?' · rust ervoor '+fmt(rb):'');
+    const right = s.hasClip ? '<button class="clipbtn" onclick="saveClip(\''+s.id+'\')">🎥 bewaar</button>'
+                            : '<div class="noclip" title="geen clip">✓</div>';
+    return '<div class="setrow done"><div class="idx">'+(i+1)+'</div>'+
+      '<div class="mid"><div class="reps">'+s.reps+' reps</div><div class="meta">'+meta+'</div></div>'+right+'</div>';
+  }).join('');
+
+  let control='';
+  if(isLive){ control=liveBlockHTML(b); }
+  else if(!live){
+    control = b.sets.length<b.targetSets
+      ? '<button class="btn primary big" onclick="startSet(\''+b.id+'\')">▶ Start set '+(b.sets.length+1)+'</button>'
+      : '<div class="row between" style="margin-top:4px"><span class="muted" style="font-size:13px">Doel gehaald — '+b.sets.length+' sets.</span><button class="btn sm ghost" style="flex:0" onclick="addExtra(\''+b.id+'\')">+ extra set</button></div>';
+  }
+  const undo = (!live && b.sets.length) ? '<button class="toggle" onclick="undoSet(\''+b.id+'\')">↶ laatste set ongedaan</button>' : '';
+
+  // work capacity + delta vs previous session
+  const prev = S.prevWC && S.prevWC[b.id];
+  let dpct='';
+  if(prev && b.sets.length){ const d=((wc(b)-prev)/Math.max(prev,1))*100; dpct=' <span style="color:'+(d>=0?'var(--ok)':'var(--bad)')+'">'+(d>=0?'+':'')+d.toFixed(0)+'%</span>'; }
+
+  return '<div class="card">'+
+    '<div class="blockhead"><h2>'+b.name+'</h2>'+
+      '<span class="gear" onclick="toggleSettings(\''+b.id+'\')">'+b.targetSets+'×'+b.targetReps+' · '+b.weight+'kg · rust '+fmt(b.restSec*1000)+' ⚙</span></div>'+
+    settingsHTML(b)+ control+
+    (b.sets.length?'<div class="sets">'+rows+'</div>':'')+
+    '<div class="wc"><span class="muted">'+b.sets.length+'/'+b.targetSets+' sets · '+totReps+' reps</span><span class="muted">work capacity <b>'+wc(b)+'</b>'+dpct+'</span></div>'+
+    undo+
+  '</div>';
+}
+
+function render(){
+  $('#dateLbl').textContent=new Date(S.date).toLocaleDateString('nl-BE',{weekday:'short',day:'numeric',month:'short'});
+  let html='';
+  if(!SECURE){
+    html+='<div class="banner"><b>Camera uit:</b> opnemen vereist <b>https</b>. Je draait op een onveilige context (bv. een gedownload <code>file://</code>-bestand), dus de camera staat uit. <b>Loggen werkt volledig.</b> Voor opname: host via https (GitHub Pages, of <code>npx http-server -S</code>).</div>';
+  }
+  html+='<div class="card"><div class="row between" style="margin-bottom:8px"><span class="pill">techniek-cues</span>'+
+    '<span class="pill" onclick="toggleMute()" style="cursor:pointer">'+(muted?'🔇 mute':'🔊 geluid')+'</span></div>'+
+    '<div class="cues">'+S.cues.map(c=>'→ <b>'+c+'</b>').join('<br>')+'</div></div>';
+
+  // hands-free options
+  html+='<div class="opts">'+
+    '<div class="opt '+(S.autoChain?'on':'')+'" onclick="toggleAutoChain()"><span>Auto-chain</span><span class="sw">'+(S.autoChain?'aan':'uit')+'</span></div>'+
+    '<div class="opt '+(S.autoStop?'on':'')+'" onclick="toggleAutoStop()"><span>Auto-stop set</span><span class="sw">'+(S.autoStop?'aan':'uit')+'</span></div>'+
+  '</div>';
+  if(S.autoStop){
+    html+='<div class="settings" style="grid-template-columns:1fr;margin-top:-4px"><div class="setting"><span>auto-stop set na</span><div class="mini"><button onclick="tweakGlobal(\'autoStopSec\',-5,5)">–</button><span class="v">'+S.autoStopSec+'s</span><button onclick="tweakGlobal(\'autoStopSec\',5,5)">+</button></div></div></div>';
+  }
+
+  if(REC_OK){
+    html+= S.camOn ? '<button class="btn ghost" onclick="disableCam()">🎥 opname uit</button>'
+                   : '<button class="btn ghost" onclick="enableCam()">🎥 film sets</button>';
+    const cc=clipCount();
+    if(cc){ html+='<div class="row" style="gap:8px;margin-top:8px">'+
+      '<button class="btn sm" onclick="saveAllClips()">⬇ bewaar alle clips ('+cc+')</button>'+
+      '<button class="btn sm ghost" onclick="clearClips()">clips wissen</button></div>'+
+      (cc>=20?'<div class="muted" style="font-size:12px;margin-top:6px;text-align:center">Veel clips opgeslagen — bewaar en wis om ruimte vrij te maken.</div>':''); }
+    html+='<div style="height:10px"></div>';
+  }
+
+  S.blocks.forEach(b=>{
+    if(b.enabled) html+=blockHTML(b);
+    else html+='<button class="btn ghost" onclick="toggleBlock(\''+b.id+'\')">+ '+b.name+' erbij ('+b.targetSets+'×'+b.targetReps+' · '+b.weight+'kg)</button><div style="height:12px"></div>';
+  });
+
+  html+='<div class="card"><div class="wc"><span>Totale work capacity vandaag</span><b>'+totalWc()+'</b></div></div>';
+  html+='<button class="btn ghost" style="color:var(--bad)" onclick="newSession()">Nieuwe sessie</button>';
+  $('#view').innerHTML=html;
+}
+
+/* ============================================================================
+   LIVE TICK — drives lead-in / running / resting transitions (named for tests)
+   ============================================================================ */
+function tickLive(){
+  if(!live) return;
+  const el=$('#bigtime');
+  if(live.phase==='leadin'){
+    const remain=live.leadSec*1000-(now()-live.leadStart);
+    if(el) el.textContent=Math.max(0,Math.ceil(remain/1000));
+    if(remain>0){ const s=Math.ceil(remain/1000); if(live._lt!==s){ live._lt=s; beepTick(); } }
+    else { beginRunning(live.blockId, live.reps); }
+    return;
+  }
+  if(live.phase==='running'){
+    if(el) el.textContent=fmt(now()-live.startAt);
+    if(S.autoStop && (now()-live.startAt)>=S.autoStopSec*1000) finishSet();
+    return;
+  }
+  // resting
+  const b=blockById(live.blockId);
+  const remain=live.restSec*1000-(now()-live.restStart);
+  if(el) el.textContent = remain>=0?fmt(remain):fmtSigned(remain);
+  if(remain<=0){
+    if(!live.beeped){ live.beeped=true; beepRestOver(); }
+    const more=b.sets.length<b.targetSets;
+    if(S.autoChain && more){ startNext(b.id); return; }   // auto-advance into next set's lead-in
+    const box=$('#restbox'), sub=$('#restsub');
+    if(box) box.classList.add('go'); if(sub) sub.textContent= more?'GO — start wanneer je klaar bent':'blok klaar';
+  } else if(remain<=3000){ const s=Math.ceil(remain/1000); if(live._lt!==s){ live._lt=s; beepTick(); } }
+}
+setInterval(tickLive,250);
+
+/* ---------- boot ---------- */
+if(S.camOn) S.camOn=false;          // camera must be re-enabled by a user gesture after reload
+render();
+</script>
+</body>
+</html>
