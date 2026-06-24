@@ -144,7 +144,9 @@ function fmtSigned(ms){ return (ms<0?'+':'')+fmt(Math.abs(ms)); }   // rest over
 // getUserMedia/MediaRecorder only run in a secure context (https or localhost).
 const SECURE = !!(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
 const REC_OK = SECURE && typeof MediaRecorder!=='undefined';
-const VIDEO_CONSTRAINTS = { video:{ facingMode:'environment', width:{ideal:1280}, height:{ideal:720} }, audio:true };
+// audio:false + capped fps — iOS Safari MediaRecorder freezes the video track mid-clip under
+// audio-muxing / high encoder load; form-review clips don't need sound.
+const VIDEO_CONSTRAINTS = { video:{ facingMode:'environment', width:{ideal:1280}, height:{ideal:720}, frameRate:{ideal:30,max:30} }, audio:false };
 let VIDEO_MIME='';
 if(typeof MediaRecorder!=='undefined' && MediaRecorder.isTypeSupported){
   ['video/mp4','video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'].forEach(m=>{ if(!VIDEO_MIME && MediaRecorder.isTypeSupported(m)) VIDEO_MIME=m; });
@@ -236,7 +238,7 @@ function startRec(){
     chunks=[]; rec=new MediaRecorder(stream, VIDEO_MIME?{mimeType:VIDEO_MIME}:undefined);
     rec.ondataavailable=e=>{ if(e.data&&e.data.size) chunks.push(e.data); };
     rec.onerror=()=>{};
-    rec.start(); recOkThisSet=true;
+    rec.start(1000); recOkThisSet=true;   // timeslice: periodic flush — fixes iOS Safari clips freezing after a few seconds
     const d=$('#recdot'); if(d) d.style.display='inline-flex';
     return true;
   }catch(e){ rec=null; return false; }
